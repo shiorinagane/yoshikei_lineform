@@ -7,12 +7,14 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { overflow-y: scroll; scrollbar-gutter: stable; }
     html, body { width: 100%; max-width: 100%; margin: 0; overflow-x: hidden; overscroll-behavior-x: none; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
       background: #f9f7ea;
       color: #524741;
       min-height: 100vh;
+      touch-action: pan-y;
     }
     header {
       background: #da3546;
