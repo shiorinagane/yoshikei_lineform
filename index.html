@@ -70,7 +70,8 @@
       padding: 24px;
     }
     #done.show { display: flex; }
-    #doneMsg { font-size: 16px; color: #524741; margin: 0 0 24px; white-space: pre-wrap; }
+    #done > * { max-width: 100%; }
+    #doneMsg { font-size: 16px; color: #524741; margin: 0 0 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
     #done .submit-btn { width: 100%; max-width: 360px; margin-top: 0; }
 
     #status {
