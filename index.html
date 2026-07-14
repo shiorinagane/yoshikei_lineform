@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アンケート</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+    }
+    header {
+      background: #e8380d;
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+    header h1 { font-size: 18px; font-weight: bold; }
+    header p { font-size: 13px; margin-top: 4px; opacity: 0.9; white-space: pre-wrap; }
+    main { padding: 16px; max-width: 480px; margin: 0 auto; }
+
+    .field { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .field > label.q-label {
+      display: block; font-size: 14px; font-weight: bold; color: #444; margin-bottom: 10px;
+    }
+    .q-label span.required {
+      background: #e8380d; color: white;
+      font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-left: 4px;
+      vertical-align: middle;
+    }
+    input[type="text"], textarea, select {
+      width: 100%; padding: 12px;
+      border: 1px solid #ddd; border-radius: 8px;
+      font-size: 15px; font-family: inherit;
+      background: white;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      outline: none; border-color: #e8380d;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .choice { display: flex; align-items: center; gap: 10px; padding: 9px 4px; font-size: 15px; }
+    .choice input { width: 20px; height: 20px; accent-color: #e8380d; flex-shrink: 0; }
+
+    .submit-btn {
+      width: 100%; padding: 16px;
+      background: #e8380d; color: white;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: bold;
+      cursor: pointer; margin-top: 8px;
+      transition: opacity 0.2s;
+    }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #status {
+      text-align: center; padding: 16px;
+      font-size: 14px; border-radius: 8px; margin-top: 12px;
+      display: none; white-space: pre-wrap;
+    }
+    #status.success { background: #e8f5e9; color: #2e7d32; display: block; }
+    #status.error   { background: #fdecea; color: #c62828; display: block; }
+    #status.info    { background: #fff8e1; color: #8d6e00; display: block; }
+
+    .loading { text-align: center; padding: 40px 16px; }
+    .loading p { color: #888; font-size: 14px; margin-top: 12px; white-space: pre-wrap; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #ddd;
+      border-top-color: #e8380d; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="formTitle">アンケート</h1>
+  <p id="formDescription"></p>
+</header>
+
+<main>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>読み込み中...</p>
+  </div>
+
+  <form id="dynamicForm" style="display:none">
+    <div id="questions"></div>
+    <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+    <div id="status"></div>
+  </form>
+</main>
+
+<script>
+  // ===== 設定 =====
+  const LIFF_ID = '2010708067';         // LINE Developers Console で取得
+  const GAS_URL = 'https://script.google.com/a/macros/iro-ha.info/s/AKfycbz6v1GeSL75m4QObkVfxrcSjCvPOls-lL2OrYTgSFGw5Jrb9uZ3tPAvmUcrT73nvn3D/exec'; // GASをデプロイしたURL（/exec で終わるもの）
+  // ================
+
+  const loading = document.getElementById('loading');
+  const form = document.getElementById('dynamicForm');
+  const statusBox = document.getElementById('status');
+
+  let profile = null;
+  let formDef = null;
+
+  // URLからフォームIDを取り出す（LIFFのliff.state経由も考慮）
+  function getFormId() {
+    const sp = new URLSearchParams(location.search);
+    let formId = sp.get('form');
+    if (!formId && sp.get('liff.state')) {
+      const state = decodeURIComponent(sp.get('liff.state'));
+      formId = new URLSearchParams(state.replace(/^[^?]*\??/, '')).get('form');
+    }
+    return formId;
+  }
+
+  function showLoadError(msg) {
+    loading.innerHTML = '<p style="color:#c62828;padding:16px">' + msg + '</p>';
+  }
+
+  liff.init({ liffId: LIFF_ID })
+    .then(async () => {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      profile = await liff.getProfile();
+
+      const formId = getFormId();
+      if (!formId) {
+        showLoadError('フォームが指定されていません。\n配信されたリンクから開き直してください。');
+        return;
+      }
+
+      const res = await fetch(GAS_URL + '?form=' + encodeURIComponent(formId));
+      const data = await res.json();
+      if (data.status !== 'ok') {
+        showLoadError('フォームを読み込めませんでした。\n' + (data.message || ''));
+        return;
+      }
+
+      formDef = data;
+      renderForm(data);
+      loading.style.display = 'none';
+      form.style.display = 'block';
+    })
+    .catch(err => {
+      showLoadError('読み込みに失敗しました。\nLINEアプリから開き直してください。');
+      console.error(err);
+    });
+
+  function renderForm(data) {
+    document.getElementById('formTitle').textContent = data.form.title;
+    document.title = data.form.title;
+    document.getElementById('formDescription').textContent = data.form.description;
+
+    const container = document.getElementById('questions');
+    container.innerHTML = '';
+
+    data.questions.forEach(q => {
+      const field = document.createElement('div');
+      field.className = 'field';
+      field.dataset.qid = q.id;
+
+      const label = document.createElement('label');
+      label.className = 'q-label';
+      label.textContent = q.label;
+      if (q.required) {
+        const badge = document.createElement('span');
+        badge.className = 'required';
+        badge.textContent = '必須';
+        label.appendChild(badge);
+      }
+      field.appendChild(label);
+
+      if (q.type === 'textarea') {
+        const el = document.createElement('textarea');
+        el.name = q.id;
+        el.placeholder = q.placeholder;
+        if (q.required) el.required = true;
+        field.appendChild(el);
+
+      } else if (q.type === 'radio' || q.type === 'checkbox') {
+        q.options.forEach(opt => {
+          const row = document.createElement('label');
+          row.className = 'choice';
+          const input = document.createElement('input');
+          input.type = q.type;
+          input.name = q.id;
+          input.value = opt;
+          row.appendChild(input);
+          row.appendChild(document.createTextNode(opt));
+          field.appendChild(row);
+        });
+
+      } else if (q.type === 'select') {
+        const el = document.createElement('select');
+        el.name = q.id;
+        if (q.required) el.required = true;
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '選択してください';
+        el.appendChild(empty);
+        q.options.forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          el.appendChild(o);
+        });
+        field.appendChild(el);
+
+      } else {
+        const el = document.createElement('input');
+        el.type = 'text';
+        el.name = q.id;
+        el.placeholder = q.placeholder;
+        if (q.required) el.required = true;
+        field.appendChild(el);
+      }
+
+      container.appendChild(field);
+    });
+  }
+
+  function collectAnswers() {
+    const answers = {};
+    for (const q of formDef.questions) {
+      if (q.type === 'checkbox') {
+        const checked = [...form.querySelectorAll('input[name="' + q.id + '"]:checked')].map(el => el.value);
+        if (q.required && checked.length === 0) {
+          return { error: '「' + q.label + '」を選択してください' };
+        }
+        answers[q.id] = checked;
+      } else if (q.type === 'radio') {
+        const el = form.querySelector('input[name="' + q.id + '"]:checked');
+        if (q.required && !el) {
+          return { error: '「' + q.label + '」を選択してください' };
+        }
+        answers[q.id] = el ? el.value : '';
+      } else {
+        const el = form.querySelector('[name="' + q.id + '"]');
+        answers[q.id] = el ? el.value.trim() : '';
+        if (q.required && !answers[q.id]) {
+          return { error: '「' + q.label + '」を入力してください' };
+        }
+      }
+    }
+    return { answers };
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+
+    statusBox.className = '';
+    statusBox.style.display = 'none';
+
+    const result = collectAnswers();
+    if (result.error) {
+      statusBox.className = 'error';
+      statusBox.textContent = result.error;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+
+    const payload = {
+      formId: formDef.form.id,
+      userId: profile.userId,
+      displayName: profile.displayName,
+      answers: result.answers,
+    };
+
+    try {
+      // Content-Typeを付けずに送るとプリフライトが発生せず、GASの応答も読める
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (data.status === 'ok') {
+        statusBox.className = 'success';
+        statusBox.textContent = '✅ ' + (data.message || '送信しました。ありがとうございました！');
+        form.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
+        setTimeout(() => liff.closeWindow(), 2500);
+      } else if (data.status === 'duplicate') {
+        statusBox.className = 'info';
+        statusBox.textContent = data.message || 'すでに回答済みです。';
+        setTimeout(() => liff.closeWindow(), 2500);
+      } else {
+        throw new Error(data.message || 'server error');
+      }
+
+    } catch (err) {
+      console.error(err);
+      statusBox.className = 'error';
+      statusBox.textContent = '送信に失敗しました。もう一度お試しください。';
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  });
+</script>
+
+</body>
+</html>
