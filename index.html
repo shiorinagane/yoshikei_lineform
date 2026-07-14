@@ -58,6 +58,19 @@
     }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    #done {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 72vh;
+      padding: 24px;
+    }
+    #done.show { display: flex; }
+    #doneMsg { font-size: 16px; color: #524741; margin: 0 0 24px; white-space: pre-wrap; }
+    #done .submit-btn { width: 100%; max-width: 360px; margin-top: 0; }
+
     #status {
       text-align: center; padding: 16px;
       font-size: 14px; border-radius: 8px; margin-top: 12px;
@@ -96,8 +109,8 @@
     <div id="status"></div>
   </form>
 
-  <div id="done" style="display:none; text-align:center; padding:40px 16px;">
-    <p id="doneMsg" style="font-size:16px; color:#524741; margin:0 0 24px; white-space:pre-wrap;"></p>
+  <div id="done">
+    <p id="doneMsg"></p>
     <button type="button" class="submit-btn" id="closeBtn">閉じる</button>
   </div>
 </main>
@@ -313,7 +326,7 @@
   function showDone(msg) {
     form.style.display = 'none';
     document.getElementById('doneMsg').textContent = msg;
-    document.getElementById('done').style.display = 'block';
+    document.getElementById('done').classList.add('show');
     window.scrollTo(0, 0);
   }
 
