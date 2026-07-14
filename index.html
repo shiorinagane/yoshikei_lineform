@@ -94,6 +94,12 @@
     <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
     <div id="status"></div>
   </form>
+
+  <div id="done" style="display:none; text-align:center; padding:40px 16px;">
+    <div style="font-size:52px; line-height:1;">✅</div>
+    <p id="doneMsg" style="font-size:15px; color:#2e7d32; margin:16px 0 24px; white-space:pre-wrap;"></p>
+    <button type="button" class="submit-btn" id="closeBtn">閉じる</button>
+  </div>
 </main>
 
 <script>
@@ -287,14 +293,9 @@
       const data = await res.json();
 
       if (data.status === 'ok') {
-        statusBox.className = 'success';
-        statusBox.textContent = '✅ ' + (data.message || '送信しました。ありがとうございました！');
-        form.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
-        setTimeout(() => liff.closeWindow(), 2500);
+        showDone(data.message || '送信しました。ありがとうございました！');
       } else if (data.status === 'duplicate') {
-        statusBox.className = 'info';
-        statusBox.textContent = data.message || 'すでに回答済みです。';
-        setTimeout(() => liff.closeWindow(), 2500);
+        showDone(data.message || 'すでに回答済みです。');
       } else {
         throw new Error(data.message || 'server error');
       }
@@ -305,6 +306,22 @@
       statusBox.textContent = '送信に失敗しました。もう一度お試しください。';
       btn.disabled = false;
       btn.textContent = '送信する';
+    }
+  });
+
+  // 送信完了画面を表示（自動では閉じない）
+  function showDone(msg) {
+    form.style.display = 'none';
+    document.getElementById('doneMsg').textContent = msg;
+    document.getElementById('done').style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+
+  document.getElementById('closeBtn').addEventListener('click', () => {
+    if (liff.isInClient()) {
+      liff.closeWindow();          // LINEアプリ内なら画面を閉じる
+    } else {
+      location.reload();           // ブラウザなら再読込（続けてテストできる）
     }
   });
 </script>
